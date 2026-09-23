@@ -11,6 +11,8 @@ from .const import (
     CONNECTION_EVENT,
     POLL_INTERVAL_SECONDS,
     RECONNECT_DELAYS,
+    SIGNAL_COMMANDS,
+    SIGNAL_POLL_SECONDS,
     TRACKED_COMMANDS,
     WRITE_SPACING_SECONDS,
 )
@@ -37,6 +39,7 @@ class EiscpClient:
         self._closing = False
         self._supervisor_task: asyncio.Task | None = None
         self._poll_task: asyncio.Task | None = None
+        self._signal_task: asyncio.Task | None = None
         self._requery_tasks: set[asyncio.Task] = set()
 
     async def connect(self) -> None:
@@ -45,11 +48,12 @@ class EiscpClient:
         self._closing = False
         self._supervisor_task = asyncio.create_task(self._run())
         self._poll_task = asyncio.create_task(self._poll_loop())
+        self._signal_task = asyncio.create_task(self._signal_poll_loop())
 
     async def close(self) -> None:
         """Stop reconnecting and close the socket."""
         self._closing = True
-        for task in (self._supervisor_task, self._poll_task):
+        for task in (self._supervisor_task, self._poll_task, self._signal_task):
             if task:
                 task.cancel()
         if self._writer:
@@ -162,6 +166,16 @@ class EiscpClient:
             await asyncio.sleep(POLL_INTERVAL_SECONDS)
             if self.connected:
                 await self._requery_all()
+
+    async def _signal_poll_loop(self) -> None:
+        while not self._closing:
+            await asyncio.sleep(SIGNAL_POLL_SECONDS)
+            if self.connected and self.values.get("PWR") == "01":
+                for cmd in SIGNAL_COMMANDS:
+                    try:
+                        await self.query(cmd)
+                    except (OSError, ConnectionError):
+                        break
 
     async def _requery_all(self) -> None:
         for cmd in TRACKED_COMMANDS:

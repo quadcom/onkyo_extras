@@ -147,6 +147,10 @@ DEFAULT_SOUND_MODES = ["00", "01", "11", "0C", "40", "42", "80", "82", "85", "FF
 
 RECONNECT_DELAYS = [1, 2, 5, 10, 30]
 POLL_INTERVAL_SECONDS = 300
+# The receiver does not push IFA/IFV when the source's signal changes, so
+# they are re-queried on their own, often, while the main zone is on.
+SIGNAL_COMMANDS = ["IFA", "IFV"]
+SIGNAL_POLL_SECONDS = 5
 WRITE_SPACING_SECONDS = 0.05
 CONNECTION_EVENT = "__connection__"
 CONNECT_TIMEOUT_SECONDS = 5
