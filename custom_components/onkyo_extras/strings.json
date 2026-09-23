@@ -1,0 +1,18 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "host": "Host",
+          "port": "Port"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to the receiver."
+    },
+    "abort": {
+      "already_configured": "This receiver is already configured."
+    }
+  }
+}
