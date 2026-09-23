@@ -85,6 +85,48 @@ def decode_tone(value: str) -> tuple[int, int]:
     return decode_tone_value(bass_raw), decode_tone_value(treble_raw)
 
 
+def parse_selectors(xml: str) -> list[tuple[str, str, int]]:
+    """Pull (id, name, zone mask) out of an NRI reply's <selectorlist>."""
+    selectors: list[tuple[str, str, int]] = []
+    for tag in re.findall(r"<selector\b[^>]*/>", xml):
+        attrs = dict(re.findall(r'(\w+)="([^"]*)"', tag))
+        if attrs.get("value", "0") == "0":
+            continue
+        selector_id = attrs.get("id", "").upper()
+        name = attrs.get("name", "")
+        zone = int(attrs.get("zone", "0") or "0", 16)
+        selectors.append((selector_id, name, zone))
+    return selectors
+
+
+def parse_zones(xml: str) -> dict[int, int]:
+    """Pull {zone id: volmax} out of an NRI reply's <zonelist>, present zones only."""
+    zones: dict[int, int] = {}
+    for tag in re.findall(r"<zone\b[^>]*/>", xml):
+        attrs = dict(re.findall(r'(\w+)="([^"]*)"', tag))
+        if attrs.get("value") != "1":
+            continue
+        zone_id = int(attrs.get("id", "0") or "0")
+        volmax = int(attrs.get("volmax", "100") or "100")
+        zones[zone_id] = volmax
+    if not zones:
+        zones[1] = 100
+    return zones
+
+
+def decode_volume(value: str, volmax: int) -> float:
+    """Decode a 2-digit hex raw step count into a 0..1 HA volume level."""
+    raw = int(value, 16)
+    return raw / (volmax * 2)
+
+
+def encode_volume(level: float, volmax: int, max_percent: float) -> str:
+    """Encode a 0..1 level as 2-digit hex raw steps, capped to max_percent."""
+    capped = min(level, max_percent / 100)
+    raw = round(capped * volmax * 2)
+    return f"{raw:02X}"
+
+
 def parse_nri(xml: str) -> tuple[str | None, str | None]:
     """Pull model and unique id out of an NRI reply's XML, by regex."""
     model_match = re.search(r"<model>([^<]+)</model>", xml)

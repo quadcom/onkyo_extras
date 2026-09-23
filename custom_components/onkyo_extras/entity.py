@@ -20,21 +20,27 @@ class OnkyoExtrasEntity(Entity):
         model: str,
         cmd: str | None,
         key: str,
+        cmds: tuple[str, ...] | None = None,
+        power_cmd: str | None = None,
     ) -> None:
         self._client = client
         self._cmd = cmd
+        self._cmds = cmds
+        self._power_cmd = power_cmd if power_cmd is not None else cmd
         self._attr_unique_id = f"{entry_unique_id}_{key}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry_unique_id)},
-            name=f"{model} extras",
+            name=model,
             manufacturer="Onkyo",
             model=model,
         )
         self._remove_listener = None
 
     async def async_added_to_hass(self) -> None:
+        watched = self._cmds if self._cmds is not None else (self._cmd,)
+
         def listener(cmd: str, value: str) -> None:
-            if cmd == CONNECTION_EVENT or (self._cmd is not None and cmd == self._cmd):
+            if cmd == CONNECTION_EVENT or cmd in watched:
                 self.async_write_ha_state()
 
         self._remove_listener = self._client.add_listener(listener)
@@ -48,6 +54,9 @@ class OnkyoExtrasEntity(Entity):
     def available(self) -> bool:
         if not self._client.connected:
             return False
+        if self._cmds is not None:
+            value = self._client.values.get(self._power_cmd)
+            return value is not None and value != "N/A"
         if self._cmd is None:
             return True
         value = self._client.values.get(self._cmd)
