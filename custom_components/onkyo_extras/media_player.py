@@ -16,7 +16,6 @@ from .const import (
     CONF_MAX_VOLUME,
     CONF_SOUND_MODES,
     DEFAULT_SOUND_MODES,
-    IFA_LISTENING_MODE,
     LISTENING_MODES,
     ZONE_COMMANDS,
 )
@@ -89,7 +88,7 @@ class OnkyoExtrasMediaPlayer(OnkyoExtrasEntity, MediaPlayerEntity):
             self._attr_name = None
             self._attr_supported_features = features | MediaPlayerEntityFeature.SELECT_SOUND_MODE
             codes = entry.options.get(CONF_SOUND_MODES, DEFAULT_SOUND_MODES)
-            self._attr_sound_mode_list = [
+            self._sound_modes = [
                 LISTENING_MODES[code] for code in codes if code in LISTENING_MODES
             ]
         else:
@@ -138,21 +137,32 @@ class OnkyoExtrasMediaPlayer(OnkyoExtrasEntity, MediaPlayerEntity):
             return None
         return self._source_by_id.get(source_id, source_id)
 
-    @property
-    def sound_mode(self) -> str | None:
-        if self._zone_id != 1:
-            return None
-        ifa = self._client.values.get("IFA")
-        if ifa and ifa != "N/A":
-            fields = ifa.split(",")
-            if len(fields) > IFA_LISTENING_MODE:
-                name = fields[IFA_LISTENING_MODE].strip()
-                if name:
-                    return name
+    def _current_sound_mode(self) -> str | None:
         code = self._client.values.get("LMD")
         if not code or code == "N/A":
             return None
+        code = code.upper()
         return LISTENING_MODES.get(code, code)
+
+    @property
+    def sound_mode(self) -> str | None:
+        """The SELECTED listening mode (LMD), as named in the mode list.
+
+        What the receiver is decoding (IFA) is the listening mode sensor.
+        """
+        if self._zone_id != 1:
+            return None
+        return self._current_sound_mode()
+
+    @property
+    def sound_mode_list(self) -> list[str] | None:
+        """The configured modes, plus the current one when it is not among them."""
+        if self._zone_id != 1:
+            return None
+        current = self._current_sound_mode()
+        if current and current not in self._sound_modes:
+            return [*self._sound_modes, current]
+        return self._sound_modes
 
     @property
     def extra_state_attributes(self) -> dict[str, str | None] | None:
